@@ -1,0 +1,8 @@
+# docker-compose.override.yml (DEV)
+services:
+  api:
+    command: sh -c "npm i && npx prisma generate && npm run start:dev"
+
+    volumes:
+      - ./:/usr/src/app
+      - /usr/src/app/node_modules

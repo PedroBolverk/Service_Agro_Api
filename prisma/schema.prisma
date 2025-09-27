@@ -1,0 +1,129 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PRODUCER
+  MECHANIC
+}
+
+enum StatusAtribuicao {
+  PENDENTE
+  ACEITA
+  RECUSADA
+  CANCELADA
+}
+
+enum RequestStatus {
+  ABERTA       // aberta e sem mecanico
+  ATRIBUIDA    // já atribuída a algum mecânico
+  CANCELADA    // cancelada pelo produtor/mecânico
+  CONCLUIDA    // finalizada
+}
+
+model Users {
+  id       String  @id @default(cuid())
+  email    String  @unique
+  password String
+  fullName String
+  role     Role
+  phone    String?
+  cpfCnpj  String?
+  stateReg String? // inscrição estadual
+
+  mechanic            Mechanic?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  // back-relations
+  SolicitacaoServicos SolicitacaoServicos[]
+  AtribuicaoServicos  AtribuicaoServicos[]
+  Message             Message[]
+
+  // avaliações feitas por este produtor (nomeamos a relação)
+  ratingsComoProdutor Rating[] @relation("RatingsDoProdutor")
+}
+
+model Mechanic {
+  userId      String   @id
+  user        Users    @relation(fields: [userId], references: [id])
+  specialty   String
+  photoUrl    String
+  isAvailable Boolean  @default(true)
+  lat         Float?
+  lng         Float?
+  updatedAt   DateTime @updatedAt
+
+  // avaliações recebidas por este mecânico
+  ratings     Rating[] @relation("RatingsDoMecanico")
+}
+
+model SolicitacaoServicos {
+  id           String               @id @default(cuid())
+  producerId   String
+  producer     Users                @relation(fields: [producerId], references: [id])
+  description  String
+  machineType  String?
+  locationLat  Float?
+  locationLng  Float?
+  scheduledFor DateTime?
+  status       RequestStatus        @default(ABERTA)
+  createdAt    DateTime             @default(now())
+  assignments  AtribuicaoServicos[]
+  messages     Message[]
+  Rating       Rating[]
+}
+
+model AtribuicaoServicos {
+  id                   String              @id @default(cuid())
+  solicitacaoServicoId String
+  solicitacaoServico   SolicitacaoServicos @relation(fields: [solicitacaoServicoId], references: [id])
+
+  mechanicId           String
+  mechanic             Users               @relation(fields: [mechanicId], references: [id])
+
+  status               StatusAtribuicao    @default(PENDENTE)
+  decidedAt            DateTime?
+  createdAt            DateTime            @default(now())
+}
+
+model Message {
+  id                   String              @id @default(cuid())
+  solicitacaoServicoId String
+  solicitacaoServico   SolicitacaoServicos @relation(fields: [solicitacaoServicoId], references: [id])
+  senderId             String
+  sender               Users               @relation(fields: [senderId], references: [id])
+  content              String
+  createdAt            DateTime            @default(now())
+}
+
+model Rating {
+  id                   String              @id @default(cuid())
+
+  // relação com o mecânico (via tabela Mechanic)
+  mechanicId           String
+  mechanic             Mechanic            @relation("RatingsDoMecanico", fields: [mechanicId], references: [userId])
+
+  // relação com o produtor (via Users) — nomeamos a relação dos dois lados
+  producerId           String
+  producer             Users               @relation("RatingsDoProdutor", fields: [producerId], references: [id])
+
+  // relação com a solicitação
+  solicitacaoServicoId String
+  solicitacaoServico   SolicitacaoServicos @relation(fields: [solicitacaoServicoId], references: [id])
+
+  score                Int
+  comment              String?
+  createdAt            DateTime            @default(now())
+}

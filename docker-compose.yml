@@ -1,0 +1,47 @@
+services:
+  api:
+    build: .
+    container_name: service-agro-api
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgresql://postgres:postgres@db:5432/service_agro?schema=public}
+      REDIS_URL: ${REDIS_URL_DOCKER:-redis://redis:6379}
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: >
+      sh -c "npm ci || npm i
+      && npx prisma generate
+      && npx prisma migrate deploy
+      && npm run build
+      && node dist/main.js"
+
+  db:
+    image: postgres:15-alpine
+    container_name: service-agro-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: service_agro
+    ports:
+      - "55432:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d service_agro"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  redis:
+    image: redis:7-alpine
+    container_name: service-agro-redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  dbdata:
