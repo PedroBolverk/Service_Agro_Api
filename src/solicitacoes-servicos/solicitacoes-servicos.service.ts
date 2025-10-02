@@ -1,15 +1,17 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { RequestStatus, StatusAtribuicao } from '@prisma/client';
+import { RequestStatus } from '@prisma/client';
 import { CreateSolicitacaoServicoDto } from './dto/create-solicitacoes-servico.dto';
 import { UpdateSolicitacoesServicoDto } from './dto/update-solicitacoes-servico.dto';
-import { RedisService } from 'src/redis/redis.service';
 
 @Injectable()
 export class SolicitacoesServicosService {
-  constructor(private prisma: PrismaService, private redis: RedisService) {}
+  constructor(
+    private prisma: PrismaService,  // PrismaService para interação com o banco de dados
+  ) {}
 
- async create(dto: CreateSolicitacaoServicoDto) {
+  // Função de criação de solicitação de serviço
+   async create(dto: CreateSolicitacaoServicoDto) {
     try {
       console.log('Dados recebidos para criação de solicitação:', dto); // Log para dados recebidos
 
@@ -52,30 +54,64 @@ export class SolicitacoesServicosService {
   }
 
   // ----------------- READS -----------------
-  async findAll() {
-    return this.prisma.solicitacaoServicos.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        producer: { select: { id: true, fullName: true, email: true } },
-        assignments: true,
-      },
-    });
+
+  // Função para buscar todas as solicitações de um produtor específico
+  async findAll(userId: string) {
+    console.log('Buscando solicitações para o userId:', userId);  // Log para verificar o userId
+
+    try {
+      // Usando Prisma para fazer a consulta, equivalente ao SQL fornecido
+      const solicitacoes = await this.prisma.solicitacaoServicos.findMany({
+        where: {
+          producerId: userId, // Filtro pelo ID do produtor logado
+        },
+        orderBy: {
+          createdAt: 'desc', // Ordena pela data de criação (mais recente primeiro)
+        },
+        include: {
+          producer: {  // Inclui os dados do produtor relacionados a cada solicitação
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      console.log('Solicitações encontradas:', solicitacoes); // Log das solicitações encontradas
+      return solicitacoes;
+
+    } catch (error) {
+      console.error('Erro na busca de solicitações:', error);
+      throw new BadRequestException('Erro ao buscar solicitações');
+    }
   }
 
+  // Função para buscar uma solicitação de serviço pelo ID
   async findOne(id: string) {
-    const sol = await this.prisma.solicitacaoServicos.findUnique({
-      where: { id },
-      include: {
-        producer: { select: { id: true, fullName: true, email: true } },
-        assignments: true,
-      },
-    });
-    if (!sol) throw new NotFoundException('Solicitação não encontrada');
-    return sol;
+    console.log('Buscando solicitação com o ID:', id);
+    try {
+      const sol = await this.prisma.solicitacaoServicos.findUnique({
+        where: { id },
+        include: {
+          producer: { select: { id: true, fullName: true, email: true } },
+          assignments: true,
+        },
+      });
+      if (!sol) throw new NotFoundException('Solicitação não encontrada');
+      return sol;
+    } catch (error) {
+      console.error('Erro ao buscar solicitação:', error);
+      throw new NotFoundException('Solicitação não encontrada');
+    }
   }
 
   // ----------------- UPDATE -----------------
+
+  // Função para atualizar uma solicitação de serviço
   async update(id: string, dto: UpdateSolicitacoesServicoDto) {
+    console.log('Atualizando solicitação com ID:', id);
     const data: any = {};
     if (dto.description !== undefined) data.description = dto.description;
     if (dto.machineType !== undefined) data.machineType = dto.machineType;
@@ -89,27 +125,35 @@ export class SolicitacoesServicosService {
         where: { id },
         data,
       });
-    } catch {
+    } catch (error) {
+      console.error('Erro ao atualizar solicitação:', error);
       throw new NotFoundException('Solicitação não encontrada');
     }
   }
 
   // ----------------- CANCEL / DELETE -----------------
+
+  // Função para cancelar uma solicitação de serviço
   async cancelar(id: string) {
+    console.log('Cancelando solicitação com ID:', id);
     try {
       return await this.prisma.solicitacaoServicos.update({
         where: { id },
         data: { status: RequestStatus.CANCELADA },
       });
-    } catch {
+    } catch (error) {
+      console.error('Erro ao cancelar solicitação:', error);
       throw new NotFoundException('Solicitação não encontrada');
     }
   }
 
+  // Função para remover uma solicitação de serviço
   async remove(id: string) {
+    console.log('Removendo solicitação com ID:', id);
     try {
       return await this.prisma.solicitacaoServicos.delete({ where: { id } });
-    } catch {
+    } catch (error) {
+      console.error('Erro ao remover solicitação:', error);
       throw new NotFoundException('Solicitação não encontrada');
     }
   }
