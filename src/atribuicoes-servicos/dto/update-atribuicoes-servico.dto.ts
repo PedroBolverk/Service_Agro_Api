@@ -1,3 +1,14 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateAtribuicaoServicoDto } from './create-atribuicoes-servico.dto';
-export class UpdateAtribuicaoServicoDto extends PartialType(CreateAtribuicaoServicoDto) { }
+import { IsEnum, IsOptional, IsDate } from 'class-validator';
+import { StatusAtribuicao } from '@prisma/client';
+import { Type } from 'class-transformer';
+
+export class UpdateAtribuicaoServicoDto {
+  @IsOptional()
+  @IsEnum(StatusAtribuicao)
+  status?: StatusAtribuicao;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  decidedAt?: Date;
+}

@@ -8,10 +8,10 @@ import { UpdateSolicitacoesServicoDto } from './dto/update-solicitacoes-servico.
 export class SolicitacoesServicosService {
   constructor(
     private prisma: PrismaService,  // PrismaService para interação com o banco de dados
-  ) {}
+  ) { }
 
   // Função de criação de solicitação de serviço
-   async create(dto: CreateSolicitacaoServicoDto) {
+  async create(dto: CreateSolicitacaoServicoDto) {
     try {
       console.log('Dados recebidos para criação de solicitação:', dto); // Log para dados recebidos
 
@@ -35,7 +35,7 @@ export class SolicitacoesServicosService {
         data: {
           description: dto.description,
           machineType: dto.machineType || '', // Caso não tenha machineType, deixe como string vazia
-          locationLat: dto.locationLat, 
+          locationLat: dto.locationLat,
           locationLng: dto.locationLng,
           scheduledFor: dto.scheduledFor ? new Date(dto.scheduledFor) : null,
           status: dto.status || RequestStatus.ABERTA, // Default para 'ABERTA'
@@ -57,35 +57,32 @@ export class SolicitacoesServicosService {
 
   // Função para buscar todas as solicitações de um produtor específico
   async findAll(userId: string) {
-    console.log('Buscando solicitações para o userId:', userId);  // Log para verificar o userId
-
-    try {
-      // Usando Prisma para fazer a consulta, equivalente ao SQL fornecido
-      const solicitacoes = await this.prisma.solicitacaoServicos.findMany({
-        where: {
-          producerId: userId, // Filtro pelo ID do produtor logado
-        },
-        orderBy: {
-          createdAt: 'desc', // Ordena pela data de criação (mais recente primeiro)
-        },
-        include: {
-          producer: {  // Inclui os dados do produtor relacionados a cada solicitação
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-            },
+    const solicitacoes = await this.prisma.solicitacaoServicos.findMany({
+      where: { producerId: userId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        producer: { select: { id: true, fullName: true, email: true, phone: true } },
+        // ✅ puxe a última atribuição ACEITA (se existir)
+        assignments: {
+          where: { status: 'ACEITA' },
+          orderBy: { decidedAt: 'desc' },
+          take: 1,
+          include: {
+            mechanic: { select: { id: true, fullName: true, email: true } },
           },
         },
-      });
+      },
+    });
 
-      console.log('Solicitações encontradas:', solicitacoes); // Log das solicitações encontradas
-      return solicitacoes;
-
-    } catch (error) {
-      console.error('Erro na busca de solicitações:', error);
-      throw new BadRequestException('Erro ao buscar solicitações');
-    }
+    // ✅ achata um campo "assignedMechanic" para o front
+    return solicitacoes.map((s) => ({
+      id: s.id,
+      description: s.description,
+      machineType: s.machineType ?? '',
+      createdAt: s.createdAt,
+      status: s.status, // ABERTA / ATRIBUIDA / ...
+      assignedMechanic: s.assignments?.[0]?.mechanic?.fullName ?? null,
+    }));
   }
 
   // Função para buscar uma solicitação de serviço pelo ID
